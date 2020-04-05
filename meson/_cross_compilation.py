@@ -1,15 +1,21 @@
 import os
 
 from configparser import ConfigParser
-from typing import Mapping, Optional, Union
+from typing import Iterable, Mapping, Optional, Union
 
 from conans import ConanFile, tools
 from conans.client.build.autotools_environment import AutoToolsBuildEnvironment
 from conans.model.settings import Settings
 
 
-def write_cross_file(path: str, conan: ConanFile) -> None:
-    with tools.environment_append(AutoToolsBuildEnvironment(conan).vars):
+def write_cross_file(path: str, conan: ConanFile,
+                     pkg_config_paths: Optional[Iterable[str]] = None) -> None:
+    pkg_config_paths = (pkg_config_paths if pkg_config_paths is not None
+                        else [conan.install_folder])
+    env = AutoToolsBuildEnvironment(conan).vars
+    if env.get('PKG_CONFIG_PATH') is None:
+        env['PKG_CONFIG_PATH'] = ':'.join(pkg_config_paths)
+    with tools.environment_append(env):
         _write_cross_file(path, conan.settings)
 
 
@@ -45,6 +51,7 @@ def create_cross_config(settings: Settings) -> CrossConfig:
             'c_link_args': os.getenv('LDFLAGS'),
             'cpp_link_args': os.getenv('LDFLAGS'),
             'needs_exe_wrapper': tools.cross_building(settings),
+            'pkg_config_libdir': os.getenv('PKG_CONFIG_PATH'),
         },
         'host_machine': {
             'system': str(settings.os).lower(),
